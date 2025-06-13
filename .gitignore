@@ -1,0 +1,8 @@
+.env
+bin/
+obj/
+.vscode/
+*.user
+*.suo
+*.exe
+*.dll
