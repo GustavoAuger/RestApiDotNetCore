@@ -1,43 +1,82 @@
-namespace SupabaseApiDemo.Services;
 using SupabaseApiDemo.Models;
-using Npgsql;
+using SupabaseApiDemo.Data;
+using SupabaseApiDemo.Utils;
+using Microsoft.EntityFrameworkCore;
 
-
-
-public class UsuarioService
+namespace SupabaseApiDemo.Services
 {
-    private readonly string _connectionString;
-
-    public UsuarioService(string connectionString)
+    public interface IUsuarioService
     {
-        _connectionString = connectionString;
+        Task<IEnumerable<Usuario>> GetAllUsuariosAsync();
+        Task<Usuario?> GetUsuarioByIdAsync(int id);
+        Task<Usuario?> GetUsuarioByEmailAsync(string email);
+        Task<Usuario> CreateUsuarioAsync(Usuario usuario);
+        Task<Usuario?> UpdateUsuarioAsync(int id, Usuario usuario);
+        Task<bool> DeleteUsuarioAsync(int id);
+
     }
 
-    public List<Usuario> GetUsuarios()
+    public class UsuarioService : IUsuarioService
     {
-        var usuarios = new List<Usuario>();
+        private readonly ApplicationDbContext _context;
 
-        using var conn = new NpgsqlConnection(_connectionString);
-        conn.Open();
-
-        var query = "SELECT id, email, nombre, id_rol, contrasena, id_bodega, estado FROM usuario";
-        using var cmd = new NpgsqlCommand(query, conn);
-        using var reader = cmd.ExecuteReader();
-
-        while (reader.Read())
-        {
-            usuarios.Add(new Usuario
-            {
-                Id = reader.GetInt32(0),
-                Email = reader.GetString(1),
-                Nombre = reader.GetString(2),
-                IdRol = reader.GetInt32(3),
-                Contrasena = reader.GetString(4),
-                IdBodega = reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                Estado = reader.GetBoolean(6)
-            });
+        public UsuarioService(ApplicationDbContext context){
+            _context = context;
         }
+        public async Task<IEnumerable<Usuario>> GetAllUsuariosAsync() { // get usuarios activos
+            return await _context.Usuarios
+                .Where(u => u.Estado)
+                .ToListAsync();
+        }
+        public async Task<Usuario?> GetUsuarioByIdAsync(int id){ // get usuariio con una id en especifico
+            return await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Id == id && u.Estado);
+        }
+        public async Task<Usuario?> GetUsuarioByEmailAsync(string email){ // get usuariio con un email en especifico y que este activo
+            return await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Email == email && u.Estado);
+        }
+        public async Task<Usuario> CreateUsuarioAsync(Usuario usuario){ // crear usuario
+            // Validar email
+            if (await Validacion.EmailExistsAsync(_context, usuario.Email)) {
+                throw new InvalidOperationException("El email ya está registrado");
+            }
 
-        return usuarios;
+            usuario.Contrasena = PassworHash.HashPassword(usuario.Contrasena);
+            usuario.Estado = true;
+
+            _context.Usuarios.Add(usuario);
+            await _context.SaveChangesAsync();
+            return usuario; 
+        }
+        public async Task<Usuario?> UpdateUsuarioAsync(int id, Usuario usuario){ // actualizar usuario
+            var existingUsuario = await _context.Usuarios.FindAsync(id);
+            if (existingUsuario == null || !existingUsuario.Estado)
+            {
+                return null;
+            }
+            // Validar email si cambió
+            if (existingUsuario.Email != usuario.Email && await Validacion.EmailExistsAsync(_context, usuario.Email)){
+                throw new InvalidOperationException("El email ya está registrado");
+            }
+            existingUsuario.Email = usuario.Email;
+            existingUsuario.Nombre = usuario.Nombre;
+            existingUsuario.IdRol = usuario.IdRol;
+            existingUsuario.IdBodega = usuario.IdBodega;
+            if (!string.IsNullOrEmpty(usuario.Contrasena)){ // Solo actualiza contraseña si se proporciona una nueva
+                existingUsuario.Contrasena = PassworHash.HashPassword(usuario.Contrasena); // encriptar contraseña
+            }
+            await _context.SaveChangesAsync();
+            return await GetUsuarioByIdAsync(id);
+        }
+        public async Task<bool> DeleteUsuarioAsync(int id){ // eliminar usuario soft delete
+            var usuario = await _context.Usuarios.FindAsync(id);
+            if (usuario == null){ // cambia estado a false
+                return false;
+            }
+            usuario.Estado = false;
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }
