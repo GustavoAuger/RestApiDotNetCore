@@ -4,14 +4,15 @@ Este proyecto es una **API RESTful en .NET Core** que gestiona usuarios, utiliza
 
 ## 📦 Estructura del Proyecto
 
-│
-├── Controllers/ # Controladores de la API
-├── Models/ # Entidades del dominio (por ahora solo Usuario)
-├── Data/ # DbContext y configuración de EF Core
-├── Services/ # Lógica de negocio (UsuarioService)
-├── Utils/ # Utilidades: validaciones y hash de contraseñas
-└── Program.cs # Configuración principal de la aplicación
-
+```text
+/
+├── Controllers/     # Controladores de la API
+├── Models/          # Entidades del dominio (por ahora solo Usuario)
+├── Data/            # DbContext y configuración de EF Core
+├── Services/        # Lógica de negocio (UsuarioService)
+├── Utils/           # Utilidades: validaciones y hash de contraseñas
+└── Program.cs       # Configuración principal de la aplicación
+```
 ---
 
 ## 🔧 Tecnologías Usadas
@@ -30,7 +31,7 @@ El proyecto utiliza un archivo `.env` para gestionar la configuración sensible 
 
 ```env
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=tu_puerto
 DB_USER=tu_usuario
 DB_PASSWORD=tu_contraseña
 DB_NAME=nombre_de_base
